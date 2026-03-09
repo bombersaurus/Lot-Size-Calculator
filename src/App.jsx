@@ -1,23 +1,21 @@
 import { useState, useMemo } from 'react'
 
-const PIP_VALUES = {
-  forex: 10,   // 1 lot = 100k units, 1 pip = $10
-  xau: 1,      // 1 lot = 100 oz, 1 pip (0.01 move) = $1
-}
+// Forex: 1 pip = 0.0001, $10/pip per lot. XAU: Lot = Risk / (Price Distance × 100).
+const PIP_SIZE_FOREX = 0.0001
+const PIP_VALUE_FOREX = 10
+const XAU_MULTIPLIER = 100
 
 function App() {
   const [assetType, setAssetType] = useState('forex')
   const [accountSize, setAccountSize] = useState('10000')
-  const [stopLoss, setStopLoss] = useState('20')
+  const [priceDistance, setPriceDistance] = useState('0.0020')
   const [riskMode, setRiskMode] = useState('percent')
   const [riskPercent, setRiskPercent] = useState('1')
   const [riskAmount, setRiskAmount] = useState('100')
 
-  const pipValue = PIP_VALUES[assetType]
-
-  const { lotSize, riskValue } = useMemo(() => {
+  const { lotSize, riskValue, formulaDenom, formulaLabel } = useMemo(() => {
     const account = parseFloat(accountSize) || 0
-    const sl = parseFloat(stopLoss) || 0
+    const distance = parseFloat(priceDistance) || 0
     let risk = 0
 
     if (riskMode === 'percent') {
@@ -27,38 +25,75 @@ function App() {
       risk = parseFloat(riskAmount) || 0
     }
 
-    if (sl <= 0 || risk <= 0) {
-      return { lotSize: 0, riskValue: risk }
+    if (risk <= 0) {
+      return { lotSize: 0, riskValue: risk, formulaDenom: 0, formulaLabel: '' }
     }
 
-    const lot = risk / (sl * pipValue)
+    if (assetType === 'xau') {
+      if (distance <= 0) return { lotSize: 0, riskValue: risk, formulaDenom: 0, formulaLabel: '' }
+      const denom = distance * XAU_MULTIPLIER
+      const lot = risk / denom
+      return {
+        lotSize: Math.max(0, Math.round(lot * 100) / 100),
+        riskValue: risk,
+        formulaDenom: denom,
+        formulaLabel: `${priceDistance || '0'} × 100`,
+      }
+    }
+
+    if (distance <= 0) return { lotSize: 0, riskValue: risk, formulaDenom: 0, formulaLabel: '' }
+    const pips = distance / PIP_SIZE_FOREX
+    const denom = pips * PIP_VALUE_FOREX
+    const lot = risk / denom
     return {
       lotSize: Math.max(0, Math.round(lot * 100) / 100),
       riskValue: risk,
+      formulaDenom: denom,
+      formulaLabel: `${(distance / PIP_SIZE_FOREX).toFixed(1)} pips × $10`,
     }
-  }, [accountSize, stopLoss, riskMode, riskPercent, riskAmount, pipValue])
+  }, [accountSize, priceDistance, riskMode, riskPercent, riskAmount, assetType])
+
+  const priceHasDecimals = priceDistance.includes('.')
+  const lotSizeDisplay = priceHasDecimals ? lotSize.toFixed(2) : String(Math.round(lotSize))
+  const riskDisplay = riskValue % 1 === 0 ? riskValue.toFixed(0) : riskValue.toFixed(2)
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-6 font-sans relative overflow-hidden">
-      {/* Background depth: subtle radial gradient blur */}
+    <div className="min-h-screen bg-[#333333] flex items-center justify-center p-6 font-sans">
       <div
-        className="absolute inset-0 pointer-events-none"
+        className="relative w-full max-w-2xl rounded-3xl bg-[#474747] p-8 md:p-12 overflow-hidden"
         style={{
-          background: 'radial-gradient(ellipse 80% 50% at 50% 40%, rgba(251,146,60,0.06) 0%, transparent 70%)',
+          boxShadow: `
+            inset 2px 2px 4px rgba(0,0,0,0.2),
+            inset -1px -1px 2px rgba(255,255,255,0.04)
+          `,
         }}
-      />
+      >
+        <div
+          className="absolute top-0 left-0 w-full h-px pointer-events-none"
+          style={{ background: 'linear-gradient(90deg, rgba(181,232,181,0.5), transparent 80%)' }}
+        />
+        <div
+          className="absolute top-0 left-0 w-px h-full pointer-events-none"
+          style={{ background: 'linear-gradient(180deg, rgba(181,232,181,0.5), transparent 80%)' }}
+        />
 
-      <div className="relative w-full max-w-4xl grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-        {/* Asset toggle - spans full width */}
-        <div className="lg:col-span-3">
-          <div className="flex gap-2 p-1 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 w-fit">
+        <div className="relative z-10">
+          <h1 className="text-2xl md:text-3xl font-semibold text-white tracking-tight mb-2">
+            Lot Size Calculator
+          </h1>
+          <p className="text-neutral-500 text-sm mb-6">
+            {assetType === 'forex' ? 'Forex & Crypto' : 'XAU/USD Gold'} position sizing
+          </p>
+
+          {/* Asset toggle */}
+          <div className="flex gap-2 mb-6">
             <button
               type="button"
               onClick={() => setAssetType('forex')}
-              className={`px-6 py-2.5 rounded-xl text-sm font-medium transition-all ${
+              className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-medium transition-all ${
                 assetType === 'forex'
-                  ? 'bg-white/10 text-white'
-                  : 'text-neutral-500 hover:text-neutral-400'
+                  ? 'bg-[#B5E8B5]/20 text-[#B5E8B5] border border-[#B5E8B5]/50'
+                  : 'bg-[#333333] text-neutral-400 border border-[#333333] hover:bg-[#333333]/90'
               }`}
             >
               Standard Forex
@@ -66,55 +101,51 @@ function App() {
             <button
               type="button"
               onClick={() => setAssetType('xau')}
-              className={`px-6 py-2.5 rounded-xl text-sm font-medium transition-all ${
+              className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-medium transition-all ${
                 assetType === 'xau'
-                  ? 'bg-white/10 text-white'
-                  : 'text-neutral-500 hover:text-neutral-400'
+                  ? 'bg-[#B5E8B5]/20 text-[#B5E8B5] border border-[#B5E8B5]/50'
+                  : 'bg-[#333333] text-neutral-400 border border-[#333333] hover:bg-[#333333]/90'
               }`}
             >
-              XAU / Gold
+              XAU/USD
             </button>
           </div>
-        </div>
 
-        {/* Inputs card - bento left/main */}
-        <div className="lg:col-span-2 rounded-3xl bg-white/5 backdrop-blur-md border border-white/10 p-6 md:p-8">
-          <h1 className="text-xl md:text-2xl font-semibold text-white tracking-tight mb-1">
-            Lot Size Calculator
-          </h1>
-          <p className="text-neutral-500 text-sm mb-6">
-            {assetType === 'forex' ? 'Forex & Crypto' : 'XAU/USD Gold'} position sizing
-          </p>
-
-          <div className="space-y-5">
+          <div className="space-y-6">
             <div>
-              <label className="block text-neutral-400 text-xs font-medium uppercase tracking-wider mb-2">
+              <label className="block text-neutral-400 text-sm font-medium mb-2">
                 Account Size ($)
               </label>
               <input
                 type="number"
                 value={accountSize}
                 onChange={(e) => setAccountSize(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 text-white placeholder-neutral-600 border-0 focus:ring-2 focus:ring-amber-500/40 focus:ring-offset-0 outline-none transition-all"
+                className="w-full px-4 py-3 rounded-xl bg-[#333333] text-white placeholder-neutral-500 border border-[#474747] focus:border-[#B5E8B5] focus:ring-1 focus:ring-[#B5E8B5]/40 outline-none transition-all"
                 placeholder="10000"
               />
             </div>
 
             <div>
-              <label className="block text-neutral-400 text-xs font-medium uppercase tracking-wider mb-2">
-                Stop Loss ({assetType === 'xau' ? 'points (0.01 = 1)' : 'pips'})
+              <label className="block text-neutral-400 text-sm font-medium mb-2">
+                Stop Loss Price Distance ($)
               </label>
               <input
                 type="number"
-                value={stopLoss}
-                onChange={(e) => setStopLoss(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-black/40 text-white placeholder-neutral-600 border-0 focus:ring-2 focus:ring-amber-500/40 focus:ring-offset-0 outline-none transition-all"
-                placeholder={assetType === 'xau' ? '10' : '20'}
+                value={priceDistance}
+                onChange={(e) => setPriceDistance(e.target.value)}
+                step={assetType === 'xau' ? '0.01' : '0.0001'}
+                className="w-full px-4 py-3 rounded-xl bg-[#333333] text-white placeholder-neutral-500 border border-[#474747] focus:border-[#B5E8B5] focus:ring-1 focus:ring-[#B5E8B5]/40 outline-none transition-all"
+                placeholder={assetType === 'xau' ? '1.243' : '0.0020'}
               />
+              <p className="text-neutral-500 text-xs mt-1.5">
+                {assetType === 'xau'
+                  ? 'Entry price − stop loss price'
+                  : 'e.g. 0.0020 = 20 pips on EUR/USD'}
+              </p>
             </div>
 
             <div>
-              <label className="block text-neutral-400 text-xs font-medium uppercase tracking-wider mb-3">
+              <label className="block text-neutral-400 text-sm font-medium mb-3">
                 Risk
               </label>
               <div className="flex gap-2 mb-3">
@@ -123,8 +154,8 @@ function App() {
                   onClick={() => setRiskMode('percent')}
                   className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-medium transition-all ${
                     riskMode === 'percent'
-                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
-                      : 'bg-black/40 text-neutral-500 border-0 hover:text-neutral-400'
+                      ? 'bg-[#B5E8B5]/20 text-[#B5E8B5] border border-[#B5E8B5]/50'
+                      : 'bg-[#333333] text-neutral-400 border border-[#333333] hover:bg-[#333333]/90'
                   }`}
                 >
                   Percentage (%)
@@ -134,8 +165,8 @@ function App() {
                   onClick={() => setRiskMode('amount')}
                   className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-medium transition-all ${
                     riskMode === 'amount'
-                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
-                      : 'bg-black/40 text-neutral-500 border-0 hover:text-neutral-400'
+                      ? 'bg-[#B5E8B5]/20 text-[#B5E8B5] border border-[#B5E8B5]/50'
+                      : 'bg-[#333333] text-neutral-400 border border-[#333333] hover:bg-[#333333]/90'
                   }`}
                 >
                   Fixed ($)
@@ -146,7 +177,7 @@ function App() {
                   type="number"
                   value={riskPercent}
                   onChange={(e) => setRiskPercent(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-black/40 text-white placeholder-neutral-600 border-0 focus:ring-2 focus:ring-amber-500/40 focus:ring-offset-0 outline-none transition-all"
+                  className="w-full px-4 py-3 rounded-xl bg-[#333333] text-white placeholder-neutral-500 border border-[#474747] focus:border-[#B5E8B5] focus:ring-1 focus:ring-[#B5E8B5]/40 outline-none transition-all"
                   placeholder="1"
                   step="0.1"
                 />
@@ -155,31 +186,41 @@ function App() {
                   type="number"
                   value={riskAmount}
                   onChange={(e) => setRiskAmount(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-black/40 text-white placeholder-neutral-600 border-0 focus:ring-2 focus:ring-amber-500/40 focus:ring-offset-0 outline-none transition-all"
+                  className="w-full px-4 py-3 rounded-xl bg-[#333333] text-white placeholder-neutral-500 border border-[#474747] focus:border-[#B5E8B5] focus:ring-1 focus:ring-[#B5E8B5]/40 outline-none transition-all"
                   placeholder="100"
                 />
               )}
             </div>
-          </div>
-        </div>
 
-        {/* Results cards - bento right, stacked */}
-        <div className="lg:col-span-1 flex flex-col gap-4">
-          <div className="flex-1 rounded-3xl bg-white/5 backdrop-blur-md border border-white/10 p-6 md:p-8 flex flex-col justify-center">
-            <p className="text-neutral-400 text-xs font-medium uppercase tracking-wider mb-2">
-              Lot Size
-            </p>
-            <p className="text-4xl md:text-5xl font-bold text-white tabular-nums leading-tight">
-              {lotSize.toFixed(2)}
-            </p>
-          </div>
-          <div className="flex-1 rounded-3xl bg-white/5 backdrop-blur-md border border-white/10 p-6 md:p-8 flex flex-col justify-center">
-            <p className="text-neutral-400 text-xs font-medium uppercase tracking-wider mb-2">
-              At Risk
-            </p>
-            <p className="text-4xl md:text-5xl font-bold text-white tabular-nums leading-tight">
-              ${riskValue.toFixed(2)}
-            </p>
+            {/* Output section */}
+            <div className="pt-8 border-t border-[#333333]">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl bg-[#333333] p-5 border border-[#474747]/80">
+                  <p className="text-neutral-400 text-sm mb-1">Lot Size</p>
+                  <p className="text-2xl font-semibold text-white tabular-nums">
+                    {lotSizeDisplay}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-[#333333] p-5 border border-[#474747]/80">
+                  <p className="text-neutral-400 text-sm mb-1">At Risk</p>
+                  <p className="text-2xl font-semibold text-[#B5E8B5] tabular-nums">
+                    ${riskDisplay}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Formula */}
+            {formulaDenom > 0 && (
+              <div className="mt-6 pt-6 border-t border-[#333333]">
+                <p className="text-neutral-400 text-xs font-medium uppercase tracking-wider mb-2">
+                  Calculation
+                </p>
+                <p className="font-mono text-neutral-400 text-sm">
+                  Lot = ${riskDisplay} ÷ ({formulaLabel}) = ${riskDisplay} ÷ {formulaDenom.toFixed(2)} = <span className="text-[#B5E8B5] font-semibold">{lotSizeDisplay}</span>
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
