@@ -54,7 +54,7 @@ function App() {
     }
   }, [accountSize, priceDistance, riskMode, riskPercent, riskAmount, assetType])
 
-  const lotSizeDisplay = lotSize % 1 === 0 ? lotSize.toFixed(0) : lotSize.toFixed(2)
+  const lotSizeDisplay = lotSize === 0 ? '0' : lotSize.toPrecision(3)
   const riskDisplay = riskValue % 1 === 0 ? riskValue.toFixed(0) : riskValue.toFixed(2)
 
   return (
