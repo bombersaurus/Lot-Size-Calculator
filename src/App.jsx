@@ -7,11 +7,11 @@ const XAU_MULTIPLIER = 100
 
 function App() {
   const [assetType, setAssetType] = useState('forex')
-  const [accountSize, setAccountSize] = useState('10000')
-  const [priceDistance, setPriceDistance] = useState('0.0020')
+  const [accountSize, setAccountSize] = useState('')
+  const [priceDistance, setPriceDistance] = useState('')
   const [riskMode, setRiskMode] = useState('percent')
-  const [riskPercent, setRiskPercent] = useState('1')
-  const [riskAmount, setRiskAmount] = useState('100')
+  const [riskPercent, setRiskPercent] = useState('')
+  const [riskAmount, setRiskAmount] = useState('')
 
   const { lotSize, riskValue, formulaDenom, formulaLabel } = useMemo(() => {
     const account = parseFloat(accountSize) || 0
