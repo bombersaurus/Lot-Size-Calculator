@@ -42,19 +42,19 @@ function App() {
     }
 
     if (distance <= 0) return { lotSize: 0, riskValue: risk, formulaDenom: 0, formulaLabel: '' }
-    const pips = distance / PIP_SIZE_FOREX
+    // If user enters a small number (e.g. 0.0020), it's price distance. If they enter 20+ it's pips.
+    const pips = distance >= 1 ? distance : distance / PIP_SIZE_FOREX
     const denom = pips * PIP_VALUE_FOREX
     const lot = risk / denom
     return {
       lotSize: Math.max(0, Math.round(lot * 100) / 100),
       riskValue: risk,
       formulaDenom: denom,
-      formulaLabel: `${(distance / PIP_SIZE_FOREX).toFixed(1)} pips × $10`,
+      formulaLabel: `${pips >= 1 ? pips.toFixed(0) : (distance / PIP_SIZE_FOREX).toFixed(1)} pips × $10`,
     }
   }, [accountSize, priceDistance, riskMode, riskPercent, riskAmount, assetType])
 
-  const priceHasDecimals = priceDistance.includes('.')
-  const lotSizeDisplay = priceHasDecimals ? lotSize.toFixed(2) : String(Math.round(lotSize))
+  const lotSizeDisplay = lotSize % 1 === 0 ? lotSize.toFixed(0) : lotSize.toFixed(2)
   const riskDisplay = riskValue % 1 === 0 ? riskValue.toFixed(0) : riskValue.toFixed(2)
 
   return (
@@ -140,7 +140,7 @@ function App() {
               <p className="text-neutral-500 text-xs mt-1.5">
                 {assetType === 'xau'
                   ? 'Entry price − stop loss price'
-                  : 'e.g. 0.0020 = 20 pips on EUR/USD'}
+                  : 'Enter pips (20) or price distance (0.0020) for EUR/USD'}
               </p>
             </div>
 
