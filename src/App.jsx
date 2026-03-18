@@ -34,7 +34,7 @@ function App() {
       const denom = distance * XAU_MULTIPLIER
       const lot = risk / denom
       return {
-        lotSize: Math.max(0, Math.round(lot * 100) / 100),
+        lotSize: Math.max(0, Math.round(lot * 100000) / 100000),
         riskValue: risk,
         formulaDenom: denom,
         formulaLabel: `${priceDistance || '0'} × 100`,
@@ -47,14 +47,21 @@ function App() {
     const denom = pips * PIP_VALUE_FOREX
     const lot = risk / denom
     return {
-      lotSize: Math.max(0, Math.round(lot * 100) / 100),
+      lotSize: Math.max(0, Math.round(lot * 100000) / 100000),
       riskValue: risk,
       formulaDenom: denom,
       formulaLabel: `${pips >= 1 ? pips.toFixed(0) : (distance / PIP_SIZE_FOREX).toFixed(1)} pips × $10`,
     }
   }, [accountSize, priceDistance, riskMode, riskPercent, riskAmount, assetType])
 
-  const lotSizeDisplay = lotSize === 0 ? '0' : lotSize.toPrecision(3)
+  const formatToSigFigs = (n, sigFigs, maxDecimals = 4) => {
+    if (n === 0) return '0'
+    const magnitude = Math.floor(Math.log10(Math.abs(n)))
+    const decimals = Math.min(Math.max(0, sigFigs - 1 - magnitude), maxDecimals)
+    const scale = Math.pow(10, decimals)
+    return (Math.round(n * scale) / scale).toFixed(decimals)
+  }
+  const lotSizeDisplay = formatToSigFigs(lotSize, 5, 4)
   const riskDisplay = riskValue % 1 === 0 ? riskValue.toFixed(0) : riskValue.toFixed(2)
 
   return (
